@@ -1,0 +1,7 @@
+build/
+*.provisionprofile
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+.DS_Store
