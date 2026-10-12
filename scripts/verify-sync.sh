@@ -41,6 +41,21 @@ else
   log "icloud-secret already installed."
 fi
 
+# selftest mode: prove the binary works on THIS Mac with a purely-local
+# store -> read -> delete, independent of any iCloud sync.
+if [ "$MODE" = "selftest" ]; then
+  log "Local round-trip on $(uname -m) (no iCloud sync involved)…"
+  printf 'icloud-secret-selftest' | "$BIN" set __selftest__ 2>/tmp/ics-verify.err
+  v="$("$BIN" get __selftest__ 2>>/tmp/ics-verify.err)"
+  "$BIN" delete __selftest__ 2>/dev/null || true
+  if [ "$v" = "icloud-secret-selftest" ]; then
+    echo "✅ binary works locally on this Mac ($(uname -m)). Any missing shared secret is an iCloud-sync gap, not the app."
+  else
+    echo "❌ local round-trip failed: $(cat /tmp/ics-verify.err 2>/dev/null)"
+  fi
+  exit 0
+fi
+
 # 2. store mode: seed the secret here from the clipboard, then exit.
 if [ "$MODE" = "store" ]; then
   log "Storing '$SECRET_NAME' from the clipboard (copy your token first)…"
