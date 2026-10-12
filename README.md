@@ -28,15 +28,19 @@ Developer account.** Only the person building a release does.
 
 ## Install
 
-Download the notarized universal binary from
-[Releases](../../releases), unzip, and move it onto your `PATH`:
+Download the notarized universal build from [Releases](../../releases). **Keep
+the `.app` bundle intact and run the binary from *inside* it** — the bundle
+carries the provisioning profile that authorizes Keychain access, so a bare
+copy of the binary extracted out of the bundle gets killed by the OS
+(`zsh: killed`). Symlink the inner binary onto your `PATH`:
 
 ```sh
-ditto -xk icloud-secret-macos-universal.zip .
-install -m 0755 iCloudSecret.app/Contents/MacOS/icloud-secret /usr/local/bin/icloud-secret
+curl -fsSL https://github.com/carterscode/icloud-secret/releases/latest/download/icloud-secret-macos-universal.zip -o /tmp/ics.zip
+mkdir -p ~/.local/share/icloud-secret ~/.local/bin
+ditto -xk /tmp/ics.zip /tmp/ics
+ditto /tmp/ics/iCloudSecret.app ~/.local/share/icloud-secret/iCloudSecret.app
+ln -sfn ~/.local/share/icloud-secret/iCloudSecret.app/Contents/MacOS/icloud-secret ~/.local/bin/icloud-secret
 ```
-
-(Or run it in place from the `.app` bundle.)
 
 ## How it works / trust model
 
