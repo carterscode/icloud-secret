@@ -48,9 +48,16 @@ jobs:
           NOTARY_KEY_ID="$NOTARY_KEY_ID" \
           NOTARY_ISSUER="$NOTARY_ISSUER" \
           scripts/build-sign.sh
+          # Wipe signing material from the runner before any later step runs.
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/cert.p12" icloud-secret.provisionprofile
 
+      # First-party publish — no third-party action, no mutable-tag supply-chain
+      # risk. Uses the built-in GITHUB_TOKEN (contents:write above).
       - name: Publish release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/icloud-secret-macos-universal.zip
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            build/icloud-secret-macos-universal.zip \
+            --title "$GITHUB_REF_NAME" --generate-notes
