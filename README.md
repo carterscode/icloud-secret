@@ -98,6 +98,38 @@ specific item to finish syncing, and a freshly-signed-in Mac may need a trusted
 device or passcode before synced items appear. So this is *unattended after
 sync*, not instantaneously guaranteed.
 
+## Troubleshooting
+
+**`-25300` (item not found) on another Mac** — the secret just hasn't synced
+there yet. iCloud Keychain is eventually-consistent, and a freshly-set-up Mac
+often **stalls**: it synced once during setup but won't pull newer items. Fixes,
+in order (re-check after each):
+
+1. System Settings → [your name] → iCloud → **Passwords & Keychain = ON**, same
+   Apple ID on every Mac; the Mac online with **date/time set automatically** (a
+   wrong clock silently blocks sync).
+2. Toggle **Passwords & Keychain OFF → wait ~15s → ON**.
+3. **Reboot** (restarts the stuck `secd`/`cloudd` sync daemons).
+4. **Most reliable:** **sign out of iCloud, reboot, then sign back in.** This
+   reliably clears a stalled keychain sync — it's what finally propagated the
+   item on a freshly-wiped Intel Mac during testing.
+
+`scripts/verify-sync.sh` polls for up to 5 minutes and prints this same list if
+the item doesn't arrive.
+
+**`zsh: killed` / exit 137** — you're running the bare binary *outside* the
+`.app` bundle. The provisioning profile that authorizes Keychain access lives in
+the bundle; keep it intact and run `…/iCloudSecret.app/Contents/MacOS/icloud-secret`
+(see [Install](#install)).
+
+**`-34018` (missing entitlement)** — the binary isn't the signed + provisioned
+release (e.g. a local unsigned build). Install the notarized release.
+
+**Intel Macs:** iCloud Keychain sync is **not** dropped on Intel — it works
+through macOS Tahoe (the last Intel-compatible release, security-supported into
+~2028). A sync stall on a new Intel Mac is the eventual-consistency issue above,
+not a hardware cutoff.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

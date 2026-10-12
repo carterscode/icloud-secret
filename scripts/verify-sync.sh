@@ -88,8 +88,13 @@ for i in $(seq 1 30); do
 done
 
 echo ""
-echo "⏳ Not synced after 5 min. Check both Macs:"
-echo "   System Settings → [your name] → iCloud → Passwords & Keychain = ON, same Apple ID."
-echo "   Seed it on the Mac that has the token:  curl -fsSL .../verify-sync.sh | bash -s store"
-echo "   Then re-run this on the other Mac."
+echo "⏳ Not synced after 5 min — iCloud Keychain on this Mac is likely stalled"
+echo "   (common on a freshly-set-up Mac: it synced once at setup but won't pull new items)."
+echo "   Try these in order, re-running this script after each:"
+echo "   1. Confirm System Settings → [your name] → iCloud → Passwords & Keychain = ON"
+echo "      (same Apple ID on every Mac), online, and date/time set automatically."
+echo "   2. Toggle Passwords & Keychain OFF, wait ~15s, then ON."
+echo "   3. Reboot (restarts the stuck secd/cloudd sync daemons)."
+echo "   4. MOST RELIABLE: sign OUT of iCloud, reboot, then sign back IN — this clears the stall."
+echo "   (Seed the token on the Mac that has it with:  curl -fsSL <this-url> | bash -s store)"
 exit 2
