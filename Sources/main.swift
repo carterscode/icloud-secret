@@ -8,11 +8,20 @@
 // The literal token "TEAMID" below is substituted with the real Apple Team ID
 // at build time; it must match the entitlement + provisioning profile.
 //
-//   icloud-secret set <name>   # secret read from stdin
-//   icloud-secret get <name>   # secret written to stdout
+//   icloud-secret set <name>            # hidden prompt when run interactively,
+//                                       # or read from stdin when piped
+//   icloud-secret set <name> <secret>   # value on the command line (see caveat)
+//   icloud-secret get <name>            # secret written to stdout
 //   icloud-secret delete <name>
 //
+// CAVEAT on `set <name> <secret>`: anything in argv is visible to `ps` for the
+// lifetime of the process and is recorded in shell history. It exists because
+// it is convenient in scripts; prefer the prompt or a pipe for a real secret.
+// In zsh with HIST_IGNORE_SPACE, prefixing the command with a space keeps it
+// out of history.
+//
 import Foundation
+import Darwin
 import Security
 import LocalAuthentication
 
@@ -45,9 +54,45 @@ func fail(_ msg: String, _ status: OSStatus? = nil) -> Never {
     exit(1)
 }
 
-func setSecret(_ name: String) {
-    let data = FileHandle.standardInput.readDataToEndOfFile()
-    guard !data.isEmpty else { fail("expected secret on stdin") }
+/// Prompt on the terminal with echo off, submitted by Enter. Returns nil only
+/// if the terminal cannot be put into no-echo mode, so a caller can fall back.
+func promptHidden(_ prompt: String) -> String? {
+    fputs(prompt, stderr)
+    var orig = termios()
+    guard tcgetattr(STDIN_FILENO, &orig) == 0 else {
+        fputs("\n", stderr)
+        return readLine(strippingNewline: true)   // no tty control; input will echo
+    }
+    var quiet = orig
+    quiet.c_lflag &= ~tcflag_t(ECHO)
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &quiet)
+    let line = readLine(strippingNewline: true)
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig)
+    fputs("\n", stderr)                            // the user's Enter was swallowed
+    return line
+}
+
+func setSecret(_ name: String, inline: String? = nil) {
+    var data: Data
+
+    if let inline = inline {
+        data = Data(inline.utf8)
+    } else if isatty(STDIN_FILENO) == 1 {
+        // Interactive: prompt, hide the input, and let Enter submit it. Reading
+        // stdin to EOF here would sit silently waiting for Ctrl-D, which looks
+        // indistinguishable from a hung command.
+        guard let typed = promptHidden("Secret for '\(name)' (hidden, Enter to submit): "),
+              !typed.isEmpty else { fail("no secret entered") }
+        data = Data(typed.utf8)
+    } else {
+        data = FileHandle.standardInput.readDataToEndOfFile()
+        // Tolerate the trailing newline that `echo`, a heredoc or a pasted line
+        // adds. Storing it silently produces a credential that fails to
+        // authenticate for reasons nobody can see.
+        while let last = data.last, last == 0x0A || last == 0x0D { data.removeLast() }
+    }
+
+    guard !data.isEmpty else { fail("expected a secret on stdin") }
     let query = baseQuery(name)
     var add = query
     add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock   // must not be *ThisDeviceOnly
@@ -84,11 +129,16 @@ func deleteSecret(_ name: String) {
 }
 
 let args = CommandLine.arguments
-guard args.count == 3, !args[2].isEmpty else {
-    fail("usage: icloud-secret <set|get|delete> <name>")
-}
+let usage = """
+usage: icloud-secret <set|get|delete> <name>
+       icloud-secret set <name> <secret>   # value on argv: visible to `ps`, kept in shell history
+       icloud-secret set <name>            # hidden prompt, or stdin when piped
+"""
+guard args.count == 3 || args.count == 4, !args[2].isEmpty else { fail(usage) }
+if args.count == 4 && args[1] != "set" { fail(usage) }
+
 switch args[1] {
-case "set":    setSecret(args[2])
+case "set":    setSecret(args[2], inline: args.count == 4 ? args[3] : nil)
 case "get":    getSecret(args[2])
 case "delete": deleteSecret(args[2])
 default:       fail("unknown command '\(args[1])'")

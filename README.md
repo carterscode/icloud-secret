@@ -4,10 +4,25 @@ A tiny macOS CLI to **store a secret in the iCloud-synced Keychain and read it
 back from a script** — something the built-in `security` tool cannot do.
 
 ```sh
-printf '%s' "$MY_TOKEN" | icloud-secret set github-token
+icloud-secret set github-token            # hidden prompt, Enter submits
+printf '%s' "$MY_TOKEN" | icloud-secret set github-token    # or pipe it
+icloud-secret set github-token "$MY_TOKEN"                  # or pass it (see below)
 icloud-secret get github-token            # on any Mac on the same iCloud account
 icloud-secret delete github-token
 ```
+
+`set` takes its value three ways:
+
+| Form | Behaviour |
+|---|---|
+| `set <name>` on a terminal | Prompts, input hidden, **Enter** submits. |
+| `set <name>` with stdin redirected | Reads stdin to EOF. A single trailing newline is stripped, so `echo "$T" \| …` and a pasted line both store a clean value. |
+| `set <name> <secret>` | Takes the value from `argv`. |
+
+The `argv` form is there because it is convenient in scripts, but the value is
+visible to `ps` for the lifetime of the process and is recorded in your shell
+history. Prefer the prompt or a pipe for anything that matters; in zsh with
+`HIST_IGNORE_SPACE`, prefixing the command with a space keeps it out of history.
 
 Items are written to the **data-protection (iCloud-synced) Keychain** with
 `kSecAttrSynchronizable = true`, so they replicate to your other Macs and
